@@ -18,15 +18,15 @@
 !
 ! Not threadsafe.
 
-module prng_i
+module prng
 
-        use iso_fortran_env, only: int32, int64
+        use iso_fortran_env, only: int32, int64, real32, real64
 
         implicit none
 
         private
 
-        public          :: rng_i_32, xor32, rng_i_64, xor1024star
+        public          :: rng_i_32, xor32, rng64, xor1024star
 
         !abstract class for single precision random number generator.
         type, abstract                 :: rng_i_32
@@ -43,7 +43,7 @@ module prng_i
                         generic, public    :: seed => seed_number, seed_array
         end type rng_i_32
 
-        type, abstract                 :: rng_i_64
+        type, abstract                 :: rng64
 
                 private
 
@@ -58,16 +58,18 @@ module prng_i
                         procedure(r64_sgen_array_32),          deferred, private :: sgen_array_32
                         procedure(r64_sgen_number_64),         deferred, private :: sgen_number_64
                         procedure(r64_sgen_array_64),          deferred, private :: sgen_array_64
+                        procedure(r64_sgen_number_64f),        deferred, private :: sgen_number_64f
                         generic, public    :: sgen => sgen_number_32,&
                                                       sgen_array_32,&
+                                                      sgen_number_64,&
                                                       sgen_array_64,&
-                                                      sgen_number_64
+                                                      sgen_number_64f
                         generic, public    :: seed => seed_64,&
                                                       seed_32
                         generic, public    :: get_seed_array_size => get_seed_array_size_32,&
                                                                      get_seed_array_size_64,&
                                                                      get_seed_array_size_def
-        end type rng_i_64
+        end type rng64
 
         !simple xorshift 32 bit internal state RNG.
         type, extends(rng_i_32) :: xor32
@@ -85,7 +87,7 @@ module prng_i
         end type xor32
 
         !xorshift1024* generator. Maximal state space of 2**1024-1.
-        type, extends(rng_i_64) :: xor1024star
+        type, extends(rng64) :: xor1024star
 
                 private
 
@@ -106,6 +108,7 @@ module prng_i
                         procedure :: sgen_array_32           => xor1024star_sgen_array_32
                         procedure :: sgen_number_64          => xor1024star_sgen_number_64
                         procedure :: sgen_array_64           => xor1024star_sgen_array_64
+                        procedure :: sgen_number_64f         => xor1024star_sgen_number_64f
         end type xor1024star
 
         abstract interface
@@ -177,11 +180,11 @@ module prng_i
         abstract interface
             pure subroutine r64_seed_array_32(self, seed_value, status)
 
-                import :: rng_i_64, int32, int64
+                import :: rng64, int32, int64
 
                 implicit none
 
-                class(rng_i_64),           intent(inout) :: self
+                class(rng64),           intent(inout) :: self
                 integer (int32),           intent(in   ) :: seed_value(:)
                 integer (int32), optional, intent(inout) :: status
 
@@ -191,11 +194,11 @@ module prng_i
         abstract interface
             pure subroutine r64_seed_array_64(self, seed_value, status)
 
-                import :: rng_i_64, int32, int64
+                import :: rng64, int32, int64
 
                 implicit none
 
-                class(rng_i_64),           intent(inout) :: self
+                class(rng64),           intent(inout) :: self
                 integer (int64),           intent(in   ) :: seed_value(:)
                 integer (int32), optional, intent(inout) :: status
 
@@ -205,11 +208,11 @@ module prng_i
         abstract interface
             pure function r64_get_seed_array_size_32(self,sample_int)
 
-                import :: rng_i_64, int32
+                import :: rng64, int32
 
                 implicit none
 
-                class(rng_i_64), intent(in   ) :: self
+                class(rng64), intent(in   ) :: self
                 integer (int32), intent(in   ) :: sample_int
 
                 integer (int32)                :: r64_get_seed_array_size_32
@@ -220,11 +223,11 @@ module prng_i
         abstract interface
             pure function r64_get_seed_array_size_64(self,sample_int)
 
-                import :: rng_i_64, int32, int64
+                import :: rng64, int32, int64
 
                 implicit none
 
-                class(rng_i_64), intent(in   ) :: self
+                class(rng64), intent(in   ) :: self
                 integer (int64), intent(in   ) :: sample_int
 
                 integer (int32)                :: r64_get_seed_array_size_64
@@ -235,11 +238,11 @@ module prng_i
         abstract interface
             pure function r64_get_seed_array_size_def(self)
 
-                import :: rng_i_64, int32, int64
+                import :: rng64, int32, int64
 
                 implicit none
 
-                class(rng_i_64), intent(in   ) :: self
+                class(rng64), intent(in   ) :: self
                 integer (int32)                :: r64_get_seed_array_size_def
 
             endfunction r64_get_seed_array_size_def
@@ -248,11 +251,11 @@ module prng_i
         abstract interface
             pure subroutine r64_incr_state(self, nsteps)
 
-                import :: rng_i_64, int32
+                import :: rng64, int32
 
                 implicit none
 
-                class(rng_i_64), intent(inout) :: self
+                class(rng64), intent(inout) :: self
                 integer (int32), intent(in   ) :: nsteps
 
             endsubroutine r64_incr_state
@@ -261,11 +264,11 @@ module prng_i
         abstract interface
             pure subroutine r64_sgen_number_32(self,rnum)
 
-                import :: rng_i_64, int32
+                import :: rng64, int32
 
                 implicit none
 
-                class(rng_i_64), intent(inout) :: self
+                class(rng64), intent(inout) :: self
                 integer (int32), intent(  out) :: rnum
 
             endsubroutine r64_sgen_number_32
@@ -274,24 +277,37 @@ module prng_i
         abstract interface
             pure subroutine r64_sgen_number_64(self,rnum)
 
-                import :: rng_i_64, int64
+                import :: rng64, int64
 
                 implicit none
 
-                class(rng_i_64), intent(inout) :: self
+                class(rng64), intent(inout) :: self
                 integer (int64), intent(  out) :: rnum
 
             endsubroutine r64_sgen_number_64
         end interface
 
         abstract interface
-            pure subroutine r64_sgen_array_32(self,rnums)
+            pure subroutine r64_sgen_number_64f(self,rnum)
 
-                import :: rng_i_64, int32
+                import :: rng64, real64
 
                 implicit none
 
-                class(rng_i_64), intent(inout) :: self
+                class(rng64), intent(inout) :: self
+                real    (real64), intent(  out) :: rnum
+
+            endsubroutine r64_sgen_number_64f
+        end interface
+
+        abstract interface
+            pure subroutine r64_sgen_array_32(self,rnums)
+
+                import :: rng64, int32
+
+                implicit none
+
+                class(rng64), intent(inout) :: self
                 integer (int32), intent(  out) :: rnums(:)
 
             endsubroutine r64_sgen_array_32
@@ -300,11 +316,11 @@ module prng_i
         abstract interface
             pure subroutine r64_sgen_array_64(self,rnums)
 
-                import :: rng_i_64, int64
+                import :: rng64, int64
 
                 implicit none
 
-                class(rng_i_64), intent(inout) :: self
+                class(rng64), intent(inout) :: self
                 integer (int64), intent(  out) :: rnums(:)
 
             endsubroutine r64_sgen_array_64
@@ -569,6 +585,21 @@ module prng_i
 
                 endsubroutine xor1024star_sgen_array_32
 
+                pure subroutine xor1024star_sgen_number_64f(self, rnum)
+
+                        implicit none
+
+                        class(xor1024star), intent(inout) :: self
+                        real    (real64),   intent(  out) :: rnum
+
+                        integer (int64)                   :: rnum_int
+
+                        call self%sgen_number_64(rnum_int)
+
+                        rnum = int64_to_real64(rnum_int)
+
+                endsubroutine xor1024star_sgen_number_64f
+
                 !given two numbers in signed 64 bit format, return signed 64 bit int 
                 !which contains binary content of the corresponding 64 bit unsigned.
                 pure function unsigned_64_bit_add(num1, num2) result(core_bits)
@@ -631,4 +662,18 @@ module prng_i
 
                 endfunction convert_2_32bit_to_64bit_unsig
 
-endmodule prng_i
+                pure function int64_to_real64(int_64) result(real_64)
+
+                        implicit none
+
+                        integer (int64), intent(in   ) :: int_64
+
+                        real    (real64) :: real_64
+
+                        real    (real64),parameter :: const1 = real(2**(-32),real64)
+                        real    (real64),parameter :: const2 = real(0.5,real64)
+
+                        real_64 = int_64*const1 + const2
+
+                endfunction int64_to_real64
+endmodule prng
